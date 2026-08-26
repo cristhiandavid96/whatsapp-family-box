@@ -2,10 +2,20 @@
 
 const express = require('express');
 const multer = require('multer');
+const path = require('path');
 const { sendTextMessage, sendAudioMessage, uploadMedia, STORAGE_DIR } = require('../services/whatsappService');
 
 const router = express.Router();
-const upload = multer({ dest: STORAGE_DIR });
+
+// Configurar multer para guardar audios con extension .ogg
+const storage = multer.diskStorage({
+  destination: (_req, _file, cb) => cb(null, STORAGE_DIR),
+  filename: (_req, file, cb) => {
+    const ext = file.mimetype.includes('ogg') ? 'ogg' : 'webm';
+    cb(null, 'voice_web_' + Date.now() + '.' + ext);
+  }
+});
+const upload = multer({ storage });
 
 const messageStore = [];
 
@@ -61,7 +71,8 @@ router.post('/send-audio', upload.single('audio'), async (req, res) => {
       return res.status(400).json({ error: 'Parametros "to" y archivo de audio son requeridos' });
     }
 
-    console.log('??? Recibido audio desde la web. Subiendo a Meta...');
+    console.log('??? Recibido audio desde la web. Archivo local:', req.file.path);
+    console.log('?? Subiendo media a Meta Cloud API...');
     const mediaId = await uploadMedia(req.file.path, req.file.mimetype || 'audio/ogg');
     console.log('? Media subida a Meta exitosamente. ID:', mediaId);
 
