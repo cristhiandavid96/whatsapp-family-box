@@ -33,14 +33,14 @@ REQUIERE Fase 2 completada.
 REQUIERE Fase 3 verificada.
 - [ ] Enviar mensaje desde WhatsApp al numero de prueba
 - [ ] Ver el payload en los logs del servidor
-- [ ] Parsear: remitente, texto, message ID, timestamp
+- [x] Parsear: remitente, texto, message ID, timestamp
 
 ### Fase 5 — Audio entrante
 REQUIERE Fase 4 probada.
-- [ ] Detectar type=audio en el payload
-- [ ] Obtener media_id
-- [ ] Descargar audio via Cloud API con WHATSAPP_TOKEN
-- [ ] Guardar temporalmente en /tmp o carpeta local
+- [x] Detectar type=audio en el payload
+- [x] Obtener media_id
+- [x] Descargar audio via Cloud API con WHATSAPP_TOKEN
+- [x] Guardar temporalmente en /tmp o carpeta local (storage/audios/)
 - [ ] Reproducir (en simulador web por ahora)
 
 ### Fase 6 — Audio saliente
