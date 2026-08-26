@@ -125,12 +125,14 @@
       justify-content: center;
       gap: 8px;
       transition: transform 0.1s, opacity 0.2s;
+      user-select: none;
     }
 
     .btn:active { transform: scale(0.97); }
 
     .btn-speak { background: var(--primary); color: white; }
     .btn-speak:hover { background: var(--primary-dark); }
+    .btn-speak.recording { background: #dc3545; color: white; animation: pulse 1s infinite; }
 
     .btn-listen { background: #007bff; color: white; }
     .btn-listen:hover { background: #0056b3; }
@@ -138,15 +140,17 @@
     .btn-send { background: var(--dark); color: white; width: 100%; margin-top: 5px; }
 
     .recording-indicator {
-      color: red;
+      color: #dc3545;
       font-weight: bold;
       animation: blink 1s infinite;
       display: none;
       text-align: center;
       font-size: 0.85rem;
+      margin: 5px 0;
     }
 
     @keyframes blink { 0% { opacity: 1; } 50% { opacity: 0.3; } 100% { opacity: 1; } }
+    @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.03); } 100% { transform: scale(1); } }
   </style>
 </head>
 <body>
@@ -169,7 +173,7 @@
       </div>
     </div>
 
-    <div class="recording-indicator" id="recIndicator">?? GRABANDO AUDIO DE VOZ...</div>
+    <div class="recording-indicator" id="recIndicator">?? GRABANDO NOTA DE VOZ... (Haz clic para terminar y enviar)</div>
 
     <div class="controls-panel">
       <div class="input-group">
@@ -201,11 +205,11 @@
     const btnSpeak = document.getElementById('btnSpeak');
     const recIndicator = document.getElementById('recIndicator');
 
-    let mediaRecorder;
+    let mediaRecorder = null;
     let audioChunks = [];
     let isRecording = false;
 
-    // Cargar mensajes peri?dicamento (polling cada 3s)
+    // Cargar mensajes peri?dicamente
     async function fetchMessages() {
       try {
         const res = await fetch('/api/messages');
@@ -233,7 +237,7 @@
         if (msg.type === 'text') {
           bodyHtml = '<div class="msg-body">?? ' + (msg.text || '') + '</div>';
         } else if (msg.type === 'audio') {
-          bodyHtml = '<div class="msg-body">??? Audio recibido (' + (msg.from || 'Remitente') + ')</div>';
+          bodyHtml = '<div class="msg-body">??? Audio ' + (msg.outgoing ? 'enviado' : 'recibido') + '</div>';
           if (msg.localFile) {
             bodyHtml += '<audio controls src="/api/audios/' + msg.localFile + '"></audio>';
           }
@@ -273,7 +277,7 @@
         const data = await res.json();
         if (data.success) {
           textInput.value = '';
-          alert('? Mensaje enviado exitosamente por WhatsApp!');
+          alert('? Mensaje de texto enviado por WhatsApp!');
           fetchMessages();
         } else {
           alert('? Error: ' + (data.error || 'No se pudo enviar'));
@@ -286,6 +290,80 @@
       }
     });
 
+    // BOT?N HABLAR ? Grabador de voz con el micr?fono
+    btnSpeak.addEventListener('click', async () => {
+      const phone = toPhone.value.trim();
+      if (!phone) {
+        alert('Por favor ingresa primero el n?mero de destino (WhatsApp)');
+        return;
+      }
+
+      if (!isRecording) {
+        // Iniciar grabaci?n de audio
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          audioChunks = [];
+          mediaRecorder = new MediaRecorder(stream);
+
+          mediaRecorder.ondataavailable = (e) => {
+            if (e.data.size > 0) audioChunks.push(e.data);
+          };
+
+          mediaRecorder.onstop = async () => {
+            const audioBlob = new Blob(audioChunks, { type: 'audio/ogg' });
+            sendRecordedAudio(audioBlob, phone);
+            stream.getTracks().forEach(track => track.stop()); // Apagar micr?fono
+          };
+
+          mediaRecorder.start();
+          isRecording = true;
+          btnSpeak.classList.add('recording');
+          btnSpeak.textContent = '?? DETENER Y ENVIAR';
+          recIndicator.style.display = 'block';
+        } catch (err) {
+          alert('? Permiso de micr?fono denegado o no soportado: ' + err.message);
+        }
+      } else {
+        // Detener grabaci?n y enviar
+        isRecording = false;
+        btnSpeak.classList.remove('recording');
+        btnSpeak.textContent = '??? BOT?N HABLAR';
+        recIndicator.style.display = 'none';
+        if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+          mediaRecorder.stop();
+        }
+      }
+    });
+
+    // Enviar audio grabado al backend
+    async function sendRecordedAudio(blob, phone) {
+      btnSpeak.disabled = true;
+      btnSpeak.textContent = '? Enviando audio...';
+
+      const formData = new FormData();
+      formData.append('to', phone);
+      formData.append('audio', blob, 'recording.ogg');
+
+      try {
+        const res = await fetch('/api/send-audio', {
+          method: 'POST',
+          body: formData
+        });
+        const data = await res.json();
+        if (data.success) {
+          alert('? Nota de voz enviada por WhatsApp!');
+          fetchMessages();
+        } else {
+          alert('? Error enviando audio: ' + (data.error || 'Fallo en el env?o'));
+        }
+      } catch (err) {
+        alert('? Error al enviar audio: ' + err.message);
+      } finally {
+        btnSpeak.disabled = false;
+        btnSpeak.textContent = '??? BOT?N HABLAR';
+      }
+    }
+
     // Bot?n escuchar: reproduce el primer audio recibido
     btnListen.addEventListener('click', () => {
       const audios = document.querySelectorAll('audio');
@@ -296,7 +374,6 @@
       }
     });
 
-    // Polling cada 3 segundos
     setInterval(fetchMessages, 3000);
     fetchMessages();
   </script>

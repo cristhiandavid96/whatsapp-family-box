@@ -1,27 +1,19 @@
 'use strict';
 
 const express = require('express');
-const { sendTextMessage, sendAudioMessage, STORAGE_DIR } = require('../services/whatsappService');
-const fs = require('fs');
-const path = require('path');
+const multer = require('multer');
+const { sendTextMessage, sendAudioMessage, uploadMedia, STORAGE_DIR } = require('../services/whatsappService');
 
 const router = express.Router();
+const upload = multer({ dest: STORAGE_DIR });
 
-// Memoria volatil para almacenar mensajes recibidos mientras corre el servidor
 const messageStore = [];
 
-/**
- * Agrega un mensaje recibido al store en memoria
- */
 function recordIncomingMessage(msg) {
-  messageStore.unshift(msg); // agregar al inicio
-  if (messageStore.length > 50) messageStore.pop(); // max 50 mensajes
+  messageStore.unshift(msg);
+  if (messageStore.length > 50) messageStore.pop();
 }
 
-/**
- * GET /api/messages
- * Devuelve la lista de mensajes recibidos en la caja
- */
 router.get('/messages', (req, res) => {
   res.json({
     success: true,
@@ -29,10 +21,6 @@ router.get('/messages', (req, res) => {
   });
 });
 
-/**
- * GET /api/audios/:filename
- * Sirve los archivos de audio guardados en storage/audios
- */
 router.get('/audios/:filename', (req, res) => {
   const filename = req.params.filename;
   const filePath = path.join(STORAGE_DIR, filename);
@@ -44,10 +32,6 @@ router.get('/audios/:filename', (req, res) => {
   res.sendFile(filePath);
 });
 
-/**
- * POST /api/send-text
- * Envia un mensaje de texto por WhatsApp a un numero destino
- */
 router.post('/send-text', async (req, res) => {
   try {
     const { to, text } = req.body;
@@ -56,9 +40,45 @@ router.post('/send-text', async (req, res) => {
     }
 
     const result = await sendTextMessage(to, text);
+    recordIncomingMessage({
+      type: 'text',
+      from: 'Caja (Web)',
+      timestamp: String(Math.floor(Date.now() / 1000)),
+      text: text,
+      outgoing: true,
+    });
     res.json({ success: true, result });
   } catch (err) {
     console.error('Error al enviar texto desde API:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.post('/send-audio', upload.single('audio'), async (req, res) => {
+  try {
+    const to = req.body.to;
+    if (!to || !req.file) {
+      return res.status(400).json({ error: 'Parametros "to" y archivo de audio son requeridos' });
+    }
+
+    console.log('??? Recibido audio desde la web. Subiendo a Meta...');
+    const mediaId = await uploadMedia(req.file.path, req.file.mimetype || 'audio/ogg');
+    console.log('? Media subida a Meta exitosamente. ID:', mediaId);
+
+    console.log('?? Enviando mensaje de audio por WhatsApp a:', to);
+    const result = await sendAudioMessage(to, mediaId);
+
+    recordIncomingMessage({
+      type: 'audio',
+      from: 'Caja (Web)',
+      timestamp: String(Math.floor(Date.now() / 1000)),
+      localFile: path.basename(req.file.path),
+      outgoing: true,
+    });
+
+    res.json({ success: true, mediaId, result });
+  } catch (err) {
+    console.error('Error al enviar audio desde API:', err.message);
     res.status(500).json({ error: err.message });
   }
 });

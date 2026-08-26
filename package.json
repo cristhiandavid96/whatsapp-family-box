@@ -11,15 +11,24 @@
   },
   "jest": {
     "testEnvironment": "node",
-    "testMatch": ["**/tests/**/*.spec.js"]
+    "testMatch": [
+      "**/tests/**/*.spec.js"
+    ]
   },
-  "keywords": ["whatsapp", "family", "cloud-api", "webhook", "node"],
+  "keywords": [
+    "whatsapp",
+    "family",
+    "cloud-api",
+    "webhook",
+    "node"
+  ],
   "author": "cristhiandavid96",
   "license": "ISC",
   "dependencies": {
     "dotenv": "^16.5.0",
     "express": "^5.2.1",
-    "morgan": "^1.10.0"
+    "morgan": "^1.10.0",
+    "multer": "^2.2.0"
   },
   "devDependencies": {
     "jest": "^29.7.0",
