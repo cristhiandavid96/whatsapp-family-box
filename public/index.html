@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WhatsApp Family Box ? Simulador</title>
+  <style>
+    :root {
+      --primary: #25D366;
+      --primary-dark: #128C7E;
+      --dark: #075E54;
+      --bg: #efeae2;
+      --card-bg: #ffffff;
+      --text: #111b21;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', system-ui, sans-serif; }
+
+    body {
+      background: #d1d7db;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      padding: 20px;
+    }
+
+    .box-container {
+      background: var(--bg);
+      width: 100%;
+      max-width: 480px;
+      border-radius: 20px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .header {
+      background: var(--dark);
+      color: white;
+      padding: 20px;
+      text-align: center;
+    }
+
+    .header h1 { font-size: 1.4rem; font-weight: 600; }
+    .header p { font-size: 0.85rem; opacity: 0.8; margin-top: 4px; }
+
+    .status-bar {
+      background: #ffeebd;
+      color: #856404;
+      padding: 8px 15px;
+      font-size: 0.8rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .status-dot { width: 10px; height: 10px; border-radius: 50%; background: #28a745; display: inline-block; }
+
+    .messages-panel {
+      flex: 1;
+      padding: 15px;
+      min-height: 300px;
+      max-height: 400px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .msg-card {
+      background: white;
+      padding: 12px 15px;
+      border-radius: 12px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+      max-width: 85%;
+      align-self: flex-start;
+      border-left: 4px solid var(--primary-dark);
+    }
+
+    .msg-card.outgoing {
+      align-self: flex-end;
+      background: #d9fdd3;
+      border-left: none;
+      border-right: 4px solid var(--primary);
+    }
+
+    .msg-header { font-size: 0.75rem; color: #667781; margin-bottom: 5px; display: flex; justify-content: space-between; }
+    .msg-body { font-size: 0.95rem; color: var(--text); word-break: break-word; }
+    
+    audio { width: 100%; margin-top: 8px; border-radius: 8px; }
+
+    .controls-panel {
+      background: #f0f2f5;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+      border-top: 1px solid #e9edef;
+    }
+
+    .input-group { display: flex; flex-direction: column; gap: 8px; }
+    .input-group label { font-size: 0.8rem; font-weight: 600; color: #54656f; }
+    .input-group input {
+      padding: 10px 14px;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      outline: none;
+    }
+    .input-group input:focus { border-color: var(--primary); }
+
+    .button-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+    .btn {
+      padding: 14px;
+      border: none;
+      border-radius: 12px;
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: transform 0.1s, opacity 0.2s;
+    }
+
+    .btn:active { transform: scale(0.97); }
+
+    .btn-speak { background: var(--primary); color: white; }
+    .btn-speak:hover { background: var(--primary-dark); }
+
+    .btn-listen { background: #007bff; color: white; }
+    .btn-listen:hover { background: #0056b3; }
+
+    .btn-send { background: var(--dark); color: white; width: 100%; margin-top: 5px; }
+
+    .recording-indicator {
+      color: red;
+      font-weight: bold;
+      animation: blink 1s infinite;
+      display: none;
+      text-align: center;
+      font-size: 0.85rem;
+    }
+
+    @keyframes blink { 0% { opacity: 1; } 50% { opacity: 0.3; } 100% { opacity: 1; } }
+  </style>
+</head>
+<body>
+
+  <div class="box-container">
+    <div class="header">
+      <h1>?? WhatsApp Family Box</h1>
+      <p>Simulador de Caja de Voz para Ni?os</p>
+    </div>
+
+    <div class="status-bar">
+      <span><span class="status-dot"></span> Servidor Conectado</span>
+      <span id="msgCount">0 Mensajes</span>
+    </div>
+
+    <div class="messages-panel" id="messagesList">
+      <div class="msg-card">
+        <div class="msg-header"><span>Sistema</span> <span>Ahora</span></div>
+        <div class="msg-body">? Simulador listo. Los mensajes recibidos por WhatsApp aparecer?n aqu?.</div>
+      </div>
+    </div>
+
+    <div class="recording-indicator" id="recIndicator">?? GRABANDO AUDIO DE VOZ...</div>
+
+    <div class="controls-panel">
+      <div class="input-group">
+        <label for="toPhone">N?mero Destino (WhatsApp):</label>
+        <input type="text" id="toPhone" placeholder="Ej: 573001234567 (con c?digo de pa?s)">
+      </div>
+
+      <div class="input-group">
+        <label for="textInput">Escribir Mensaje de Texto (Opcional):</label>
+        <input type="text" id="textInput" placeholder="Escribe un mensaje para enviar...">
+      </div>
+
+      <button class="btn btn-send" id="btnSendText">?? Enviar Mensaje de Texto</button>
+
+      <div class="button-grid" style="margin-top: 10px;">
+        <button class="btn btn-speak" id="btnSpeak">??? BOT?N HABLAR</button>
+        <button class="btn btn-listen" id="btnListen">?? BOT?N ESCUCHAR</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const messagesList = document.getElementById('messagesList');
+    const msgCount = document.getElementById('msgCount');
+    const toPhone = document.getElementById('toPhone');
+    const textInput = document.getElementById('textInput');
+    const btnSendText = document.getElementById('btnSendText');
+    const btnListen = document.getElementById('btnListen');
+    const btnSpeak = document.getElementById('btnSpeak');
+    const recIndicator = document.getElementById('recIndicator');
+
+    let mediaRecorder;
+    let audioChunks = [];
+    let isRecording = false;
+
+    // Cargar mensajes peri?dicamento (polling cada 3s)
+    async function fetchMessages() {
+      try {
+        const res = await fetch('/api/messages');
+        const data = await res.json();
+        if (data.success) {
+          renderMessages(data.messages);
+        }
+      } catch (err) {
+        console.error('Error cargando mensajes:', err);
+      }
+    }
+
+    function renderMessages(messages) {
+      msgCount.textContent = messages.length + ' Mensajes';
+      if (messages.length === 0) return;
+
+      messagesList.innerHTML = '';
+      messages.forEach(msg => {
+        const card = document.createElement('div');
+        card.className = 'msg-card' + (msg.outgoing ? ' outgoing' : '');
+
+        const timeStr = msg.timestamp ? new Date(Number(msg.timestamp) * 1000).toLocaleTimeString() : new Date().toLocaleTimeString();
+        
+        let bodyHtml = '';
+        if (msg.type === 'text') {
+          bodyHtml = '<div class="msg-body">?? ' + (msg.text || '') + '</div>';
+        } else if (msg.type === 'audio') {
+          bodyHtml = '<div class="msg-body">??? Audio recibido (' + (msg.from || 'Remitente') + ')</div>';
+          if (msg.localFile) {
+            bodyHtml += '<audio controls src="/api/audios/' + msg.localFile + '"></audio>';
+          }
+        } else {
+          bodyHtml = '<div class="msg-body">?? Tipo: ' + msg.type + '</div>';
+        }
+
+        card.innerHTML = `
+          <div class="msg-header">
+            <span>${msg.outgoing ? 'Enviado por Caja' : ('De: ' + (msg.from || 'Familia'))}</span>
+            <span>${timeStr}</span>
+          </div>
+          ${bodyHtml}
+        `;
+        messagesList.appendChild(card);
+      });
+    }
+
+    // Enviar texto
+    btnSendText.addEventListener('click', async () => {
+      const phone = toPhone.value.trim();
+      const text = textInput.value.trim();
+      if (!phone || !text) {
+        alert('Por favor ingresa el n?mero destino y un texto');
+        return;
+      }
+
+      btnSendText.disabled = true;
+      btnSendText.textContent = 'Enviando...';
+
+      try {
+        const res = await fetch('/api/send-text', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ to: phone, text: text })
+        });
+        const data = await res.json();
+        if (data.success) {
+          textInput.value = '';
+          alert('? Mensaje enviado exitosamente por WhatsApp!');
+          fetchMessages();
+        } else {
+          alert('? Error: ' + (data.error || 'No se pudo enviar'));
+        }
+      } catch (err) {
+        alert('? Error de red: ' + err.message);
+      } finally {
+        btnSendText.disabled = false;
+        btnSendText.textContent = '?? Enviar Mensaje de Texto';
+      }
+    });
+
+    // Bot?n escuchar: reproduce el primer audio recibido
+    btnListen.addEventListener('click', () => {
+      const audios = document.querySelectorAll('audio');
+      if (audios.length > 0) {
+        audios[0].play();
+      } else {
+        alert('?? No hay audios pendientes por escuchar.');
+      }
+    });
+
+    // Polling cada 3 segundos
+    setInterval(fetchMessages, 3000);
+    fetchMessages();
+  </script>
+</body>
+</html>

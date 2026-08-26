@@ -3,6 +3,7 @@
 const express = require('express');
 const { parseIncomingMessage, isAuthorizedSender, formatMessageLog } = require('../handlers/messageHandler');
 const { getMediaMetadata, downloadMediaFile } = require('../services/whatsappService');
+const { recordIncomingMessage } = require('./api');
 
 const router = express.Router();
 
@@ -51,17 +52,26 @@ router.post('/', async (req, res) => {
 
   try {
     if (parsed.type === 'text') {
-      console.log('?? Texto recibido:', parsed.payload && parsed.payload.body);
+      const text = parsed.payload && parsed.payload.body;
+      console.log('?? Texto recibido:', text);
+      recordIncomingMessage({
+        type: 'text',
+        from: parsed.from,
+        timestamp: parsed.timestamp,
+        text: text,
+        outgoing: false,
+      });
     } else if (parsed.type === 'audio') {
       const mediaId = parsed.payload && parsed.payload.id;
       console.log('??? Audio recibido ? media_id:', mediaId);
 
+      let filename = null;
       if (process.env.WHATSAPP_TOKEN) {
         try {
           console.log('?? Obteniendo metadatos del audio ID:', mediaId);
           const meta = await getMediaMetadata(mediaId);
           const ext = meta.mime_type && meta.mime_type.includes('ogg') ? 'ogg' : 'mp3';
-          const filename = 'audio_' + Date.now() + '_' + mediaId + '.' + ext;
+          filename = 'audio_' + Date.now() + '_' + mediaId + '.' + ext;
           
           console.log('?? Descargando archivo de audio desde Meta...');
           const localPath = await downloadMediaFile(meta.url, filename);
@@ -69,9 +79,16 @@ router.post('/', async (req, res) => {
         } catch (downloadErr) {
           console.error('? Error al descargar audio:', downloadErr.message);
         }
-      } else {
-        console.log('?? WHATSAPP_TOKEN no configurado en .env. El audio no se descargo a disco.');
       }
+
+      recordIncomingMessage({
+        type: 'audio',
+        from: parsed.from,
+        timestamp: parsed.timestamp,
+        mediaId: mediaId,
+        localFile: filename,
+        outgoing: false,
+      });
     } else if (parsed.type === 'image') {
       console.log('??? Imagen recibida ? media_id:', parsed.payload && parsed.payload.id);
     } else {
