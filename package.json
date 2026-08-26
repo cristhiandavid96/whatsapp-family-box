@@ -1,15 +1,28 @@
 {
   "name": "whatsapp-family-box",
   "version": "1.0.0",
-  "main": "index.js",
+  "description": "Caja de mensajes de voz para familia via WhatsApp Cloud API",
+  "main": "src/server.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node src/server.js",
+    "test": "jest --forceExit",
+    "test:watch": "jest --watch --forceExit",
+    "test:coverage": "jest --coverage --forceExit"
   },
-  "keywords": [],
-  "author": "",
+  "jest": {
+    "testEnvironment": "node",
+    "testMatch": ["**/tests/**/*.spec.js"]
+  },
+  "keywords": ["whatsapp", "family", "cloud-api", "webhook", "node"],
+  "author": "cristhiandavid96",
   "license": "ISC",
-  "description": "",
   "dependencies": {
-    "express": "^5.2.1"
+    "dotenv": "^16.5.0",
+    "express": "^5.2.1",
+    "morgan": "^1.10.0"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "supertest": "^7.1.0"
   }
 }
