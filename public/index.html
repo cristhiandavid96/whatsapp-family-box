@@ -303,7 +303,19 @@
         try {
           const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
           audioChunks = [];
-          mediaRecorder = new MediaRecorder(stream);
+          
+          let options = {};
+          if (typeof MediaRecorder.isTypeSupported === 'function') {
+            if (MediaRecorder.isTypeSupported('audio/mp4')) {
+              options = { mimeType: 'audio/mp4' };
+            } else if (MediaRecorder.isTypeSupported('audio/ogg;codecs=opus')) {
+              options = { mimeType: 'audio/ogg;codecs=opus' };
+            } else if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
+              options = { mimeType: 'audio/webm;codecs=opus' };
+            }
+          }
+
+          mediaRecorder = new MediaRecorder(stream, options);
 
           mediaRecorder.ondataavailable = (e) => {
             if (e.data.size > 0) audioChunks.push(e.data);
