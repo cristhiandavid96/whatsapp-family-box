@@ -4,6 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>WhatsApp Family Box ? Simulador</title>
+  <!-- Encoder de MP3 puro en Javascript (lamejs) -->
+  <script src="https://cdn.jsdelivr.net/npm/lamejs@1.2.1/lame.min.js"></script>
   <style>
     :root {
       --primary: #25D366;
@@ -173,12 +175,12 @@
       </div>
     </div>
 
-    <div class="recording-indicator" id="recIndicator">?? GRABANDO NOTA DE VOZ... (Haz clic para terminar y enviar)</div>
+    <div class="recording-indicator" id="recIndicator">?? GRABANDO NOTA DE VOZ MP3... (Haz clic para terminar y enviar)</div>
 
     <div class="controls-panel">
       <div class="input-group">
         <label for="toPhone">N?mero Destino (WhatsApp):</label>
-        <input type="text" id="toPhone" placeholder="Ej: 573001234567 (con c?digo de pa?s)">
+        <input type="text" id="toPhone" value="573013096983" placeholder="Ej: 573001234567">
       </div>
 
       <div class="input-group">
@@ -205,11 +207,13 @@
     const btnSpeak = document.getElementById('btnSpeak');
     const recIndicator = document.getElementById('recIndicator');
 
-    let mediaRecorder = null;
-    let audioChunks = [];
+    let audioContext = null;
+    let microphoneStream = null;
+    let scriptProcessor = null;
+    let mp3Encoder = null;
+    let mp3Data = [];
     let isRecording = false;
 
-    // Cargar mensajes peri?dicamente
     async function fetchMessages() {
       try {
         const res = await fetch('/api/messages');
@@ -290,7 +294,7 @@
       }
     });
 
-    // BOT?N HABLAR ? Grabador de voz con el micr?fono
+    // BOT?N HABLAR ? Grabaci?n y codificaci?n directa a MP3 con Web Audio API y lamejs
     btnSpeak.addEventListener('click', async () => {
       const phone = toPhone.value.trim();
       if (!phone) {
@@ -299,35 +303,43 @@
       }
 
       if (!isRecording) {
-        // Iniciar grabaci?n de audio
         try {
-          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-          audioChunks = [];
+          microphoneStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          const sampleRate = 44100;
+          audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: sampleRate });
+          const source = audioContext.createMediaStreamSource(microphoneStream);
           
-          let options = {};
-          if (typeof MediaRecorder.isTypeSupported === 'function') {
-            if (MediaRecorder.isTypeSupported('audio/mp4')) {
-              options = { mimeType: 'audio/mp4' };
-            } else if (MediaRecorder.isTypeSupported('audio/ogg;codecs=opus')) {
-              options = { mimeType: 'audio/ogg;codecs=opus' };
-            } else if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
-              options = { mimeType: 'audio/webm;codecs=opus' };
-            }
+          // Crear procesador de audio PCM
+          const bufferSize = 4096;
+          scriptProcessor = audioContext.createScriptProcessor(bufferSize, 1, 1);
+          
+          // Crear codificador MP3 de lamejs (mono, 44.1kHz, 128kbps)
+          if (typeof lamejs !== 'undefined') {
+            mp3Encoder = new lamejs.Mp3Encoder(1, sampleRate, 128);
+          } else {
+            console.warn('lamejs no cargado, cayendo en fallback MediaRecorder');
           }
+          mp3Data = [];
 
-          mediaRecorder = new MediaRecorder(stream, options);
-
-          mediaRecorder.ondataavailable = (e) => {
-            if (e.data.size > 0) audioChunks.push(e.data);
+          scriptProcessor.onaudioprocess = (e) => {
+            if (!isRecording) return;
+            const inputBuffer = e.inputBuffer.getChannelData(0);
+            
+            if (mp3Encoder) {
+              // Convertir Float32 a Int16 para lamejs
+              const samples = new Int16Array(inputBuffer.length);
+              for (let i = 0; i < inputBuffer.length; i++) {
+                let s = Math.max(-1, Math.min(1, inputBuffer[i]));
+                samples[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+              }
+              const mp3buf = mp3Encoder.encodeBuffer(samples);
+              if (mp3buf.length > 0) mp3Data.push(mp3buf);
+            }
           };
 
-          mediaRecorder.onstop = async () => {
-            const audioBlob = new Blob(audioChunks, { type: 'audio/ogg' });
-            sendRecordedAudio(audioBlob, phone);
-            stream.getTracks().forEach(track => track.stop()); // Apagar micr?fono
-          };
+          source.connect(scriptProcessor);
+          scriptProcessor.connect(audioContext.destination);
 
-          mediaRecorder.start();
           isRecording = true;
           btnSpeak.classList.add('recording');
           btnSpeak.textContent = '?? DETENER Y ENVIAR';
@@ -336,25 +348,32 @@
           alert('? Permiso de micr?fono denegado o no soportado: ' + err.message);
         }
       } else {
-        // Detener grabaci?n y enviar
+        // Detener grabaci?n MP3
         isRecording = false;
         btnSpeak.classList.remove('recording');
         btnSpeak.textContent = '??? BOT?N HABLAR';
         recIndicator.style.display = 'none';
-        if (mediaRecorder && mediaRecorder.state !== 'inactive') {
-          mediaRecorder.stop();
+
+        if (scriptProcessor) scriptProcessor.disconnect();
+        if (microphoneStream) microphoneStream.getTracks().forEach(t => t.stop());
+        if (audioContext) audioContext.close();
+
+        if (mp3Encoder) {
+          const mp3buf = mp3Encoder.flush();
+          if (mp3buf.length > 0) mp3Data.push(mp3buf);
+          const blob = new Blob(mp3Data, { type: 'audio/mp3' });
+          sendRecordedAudioMP3(blob, phone);
         }
       }
     });
 
-    // Enviar audio grabado al backend
-    async function sendRecordedAudio(blob, phone) {
+    async function sendRecordedAudioMP3(blob, phone) {
       btnSpeak.disabled = true;
-      btnSpeak.textContent = '? Enviando audio...';
+      btnSpeak.textContent = '? Enviando nota de voz MP3...';
 
       const formData = new FormData();
       formData.append('to', phone);
-      formData.append('audio', blob, 'recording.ogg');
+      formData.append('audio', blob, 'voice_' + Date.now() + '.mp3');
 
       try {
         const res = await fetch('/api/send-audio', {
@@ -363,7 +382,7 @@
         });
         const data = await res.json();
         if (data.success) {
-          alert('? Nota de voz enviada por WhatsApp!');
+          alert('? Nota de voz MP3 enviada por WhatsApp!');
           fetchMessages();
         } else {
           alert('? Error enviando audio: ' + (data.error || 'Fallo en el env?o'));
@@ -376,7 +395,7 @@
       }
     }
 
-    // Bot?n escuchar: reproduce el primer audio recibido
+    // Bot?n escuchar
     btnListen.addEventListener('click', () => {
       const audios = document.querySelectorAll('audio');
       if (audios.length > 0) {

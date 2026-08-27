@@ -11,7 +11,7 @@ const router = express.Router();
 const storage = multer.diskStorage({
   destination: (_req, _file, cb) => cb(null, STORAGE_DIR),
   filename: (_req, file, cb) => {
-    const ext = file.mimetype && file.mimetype.includes('ogg') ? 'ogg' : 'webm';
+    const ext = 'mp3';
     cb(null, 'voice_web_' + Date.now() + '.' + ext);
   }
 });
@@ -79,7 +79,7 @@ router.post('/send-audio', upload.single('audio'), async (req, res) => {
 
     console.log('??? Recibido audio desde la web. Archivo local:', req.file.path);
     console.log('?? Subiendo media a Meta Cloud API...');
-    const mediaId = await uploadMedia(req.file.path, req.file.mimetype || 'audio/ogg');
+    const mediaId = await uploadMedia(req.file.path, 'audio/mpeg');
     console.log('? Media subida a Meta exitosamente. ID:', mediaId);
 
     console.log('?? Enviando mensaje de audio por WhatsApp a:', to);
