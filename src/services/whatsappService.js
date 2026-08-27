@@ -47,6 +47,7 @@ async function downloadMediaFile(mediaUrl, filename) {
 async function sendTextMessage(to, textBody) {
   const token = process.env.WHATSAPP_TOKEN || WHATSAPP_TOKEN;
   const phoneId = process.env.PHONE_NUMBER_ID || PHONE_NUMBER_ID;
+  const cleanTo = String(to).replace(/[^0-9]/g, '');
 
   const response = await fetch(`${GRAPH_API_URL}/${phoneId}/messages`, {
     method: 'POST',
@@ -57,7 +58,7 @@ async function sendTextMessage(to, textBody) {
     body: JSON.stringify({
       messaging_product: 'whatsapp',
       recipient_type: 'individual',
-      to: to,
+      to: cleanTo,
       type: 'text',
       text: { body: textBody },
     }),
@@ -74,6 +75,7 @@ async function sendTextMessage(to, textBody) {
 async function sendAudioMessage(to, mediaId) {
   const token = process.env.WHATSAPP_TOKEN || WHATSAPP_TOKEN;
   const phoneId = process.env.PHONE_NUMBER_ID || PHONE_NUMBER_ID;
+  const cleanTo = String(to).replace(/[^0-9]/g, '');
 
   const response = await fetch(`${GRAPH_API_URL}/${phoneId}/messages`, {
     method: 'POST',
@@ -84,7 +86,7 @@ async function sendAudioMessage(to, mediaId) {
     body: JSON.stringify({
       messaging_product: 'whatsapp',
       recipient_type: 'individual',
-      to: to,
+      to: cleanTo,
       type: 'audio',
       audio: { id: mediaId },
     }),
@@ -98,12 +100,6 @@ async function sendAudioMessage(to, mediaId) {
   return data;
 }
 
-/**
- * Sube un archivo binario de audio local a los servidores de Meta WhatsApp.
- * @param {string} filePath - Ruta local del archivo de audio.
- * @param {string} mimeType - Mime type (ej: 'audio/ogg' o 'audio/mp4').
- * @returns {Promise<string>} mediaId asignado por Meta.
- */
 async function uploadMedia(filePath, mimeType = 'audio/ogg') {
   const token = process.env.WHATSAPP_TOKEN || WHATSAPP_TOKEN;
   const phoneId = process.env.PHONE_NUMBER_ID || PHONE_NUMBER_ID;
@@ -129,7 +125,7 @@ async function uploadMedia(filePath, mimeType = 'audio/ogg') {
     throw new Error(`Error al subir archivo a Meta (${response.status}): ${JSON.stringify(data)}`);
   }
 
-  return data.id; // mediaId
+  return data.id;
 }
 
 module.exports = {

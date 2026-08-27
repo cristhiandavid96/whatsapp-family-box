@@ -2,16 +2,16 @@
 
 const express = require('express');
 const multer = require('multer');
+const fs = require('fs');
 const path = require('path');
 const { sendTextMessage, sendAudioMessage, uploadMedia, STORAGE_DIR } = require('../services/whatsappService');
 
 const router = express.Router();
 
-// Configurar multer para guardar audios con extension .ogg
 const storage = multer.diskStorage({
   destination: (_req, _file, cb) => cb(null, STORAGE_DIR),
   filename: (_req, file, cb) => {
-    const ext = file.mimetype.includes('ogg') ? 'ogg' : 'webm';
+    const ext = file.mimetype && file.mimetype.includes('ogg') ? 'ogg' : 'webm';
     cb(null, 'voice_web_' + Date.now() + '.' + ext);
   }
 });
@@ -44,10 +44,13 @@ router.get('/audios/:filename', (req, res) => {
 
 router.post('/send-text', async (req, res) => {
   try {
-    const { to, text } = req.body;
+    let { to, text } = req.body;
     if (!to || !text) {
       return res.status(400).json({ error: 'Parametros "to" y "text" son requeridos' });
     }
+
+    // Limpiar signo + y espacios
+    to = String(to).replace(/[^0-9]/g, '');
 
     const result = await sendTextMessage(to, text);
     recordIncomingMessage({
@@ -66,10 +69,13 @@ router.post('/send-text', async (req, res) => {
 
 router.post('/send-audio', upload.single('audio'), async (req, res) => {
   try {
-    const to = req.body.to;
+    let to = req.body.to;
     if (!to || !req.file) {
       return res.status(400).json({ error: 'Parametros "to" y archivo de audio son requeridos' });
     }
+
+    // Limpiar signo + y espacios
+    to = String(to).replace(/[^0-9]/g, '');
 
     console.log('??? Recibido audio desde la web. Archivo local:', req.file.path);
     console.log('?? Subiendo media a Meta Cloud API...');
