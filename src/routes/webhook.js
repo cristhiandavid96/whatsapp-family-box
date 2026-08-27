@@ -10,7 +10,6 @@ const router = express.Router();
 const AUTHORIZED_NUMBERS = (process.env.AUTHORIZED_NUMBERS || '').split(',').filter(Boolean);
 const VERIFY_TOKEN = process.env.WEBHOOK_VERIFY_TOKEN || 'family-box-test';
 
-// GET /webhook ? Verificacion del webhook de Meta
 router.get('/', (req, res) => {
   const mode = req.query['hub.mode'];
   const token = req.query['hub.verify_token'];
@@ -27,7 +26,6 @@ router.get('/', (req, res) => {
   return res.sendStatus(403);
 });
 
-// POST /webhook ? Recepcion de eventos de WhatsApp
 router.post('/', async (req, res) => {
   const body = req.body;
 
@@ -63,21 +61,30 @@ router.post('/', async (req, res) => {
       });
     } else if (parsed.type === 'audio') {
       const mediaId = parsed.payload && parsed.payload.id;
-      console.log('??? Audio recibido ? media_id:', mediaId);
+      const directUrl = parsed.payload && parsed.payload.url;
+      const mimeType = (parsed.payload && parsed.payload.mime_type) || 'audio/ogg';
+      console.log('??? Audio recibido de WhatsApp ? media_id:', mediaId);
 
       let filename = null;
       if (process.env.WHATSAPP_TOKEN) {
         try {
-          console.log('?? Obteniendo metadatos del audio ID:', mediaId);
-          const meta = await getMediaMetadata(mediaId);
-          const ext = meta.mime_type && meta.mime_type.includes('ogg') ? 'ogg' : 'mp3';
-          filename = 'audio_' + Date.now() + '_' + mediaId + '.' + ext;
+          let downloadUrl = directUrl;
+          if (!downloadUrl) {
+            console.log('?? Consultando URL de descarga para media ID:', mediaId);
+            const meta = await getMediaMetadata(mediaId);
+            downloadUrl = meta.url;
+          } else {
+            console.log('? Usando URL de descarga directa entregada por el webhook!');
+          }
+
+          const ext = mimeType.includes('ogg') ? 'ogg' : 'mp3';
+          filename = 'audio_in_' + Date.now() + '_' + mediaId + '.' + ext;
           
           console.log('?? Descargando archivo de audio desde Meta...');
-          const localPath = await downloadMediaFile(meta.url, filename);
-          console.log('? Audio guardado exitosamente en:', localPath);
+          const localPath = await downloadMediaFile(downloadUrl, filename);
+          console.log('? Audio entrante guardado exitosamente en:', localPath);
         } catch (downloadErr) {
-          console.error('? Error al descargar audio:', downloadErr.message);
+          console.error('? Error al descargar audio entrante:', downloadErr.message);
         }
       }
 
