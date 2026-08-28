@@ -3,7 +3,7 @@
 var request = require('supertest');
 var app = require('../src/server');
 
-var VERIFY_TOKEN = 'family-box-test';
+var VERIFY_TOKEN = process.env.WEBHOOK_VERIFY_TOKEN || 'family-box-test';
 
 // GET /webhook ? Verificacion de Meta
 describe('GET /webhook ? Verificacion del webhook', function() {
