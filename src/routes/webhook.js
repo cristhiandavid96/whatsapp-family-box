@@ -67,6 +67,9 @@ router.post('/', async (req, res) => {
 
       let filename = null;
       if (process.env.WHATSAPP_TOKEN) {
+        const ext = mimeType.includes('ogg') ? 'ogg' : 'mp3';
+        const candidateFilename = 'audio_in_' + Date.now() + '_' + mediaId + '.' + ext;
+
         try {
           let downloadUrl = directUrl;
           if (!downloadUrl) {
@@ -77,14 +80,28 @@ router.post('/', async (req, res) => {
             console.log('? Usando URL de descarga directa entregada por el webhook!');
           }
 
-          const ext = mimeType.includes('ogg') ? 'ogg' : 'mp3';
-          filename = 'audio_in_' + Date.now() + '_' + mediaId + '.' + ext;
-          
           console.log('?? Descargando archivo de audio desde Meta...');
-          const localPath = await downloadMediaFile(downloadUrl, filename);
+          const localPath = await downloadMediaFile(downloadUrl, candidateFilename);
+          filename = candidateFilename;
           console.log('? Audio entrante guardado exitosamente en:', localPath);
         } catch (downloadErr) {
-          console.error('? Error al descargar audio entrante:', downloadErr.message);
+          console.error('? Error al descargar audio entrante con la URL del webhook:', downloadErr.message);
+
+          // La URL directa que entrega el webhook (lookaside.fbsbx.com) expira
+          // pocos minutos despues de generada. Si fallo (403/410/expirada) y
+          // veniamos usando esa URL directa, reintentamos una sola vez pidiendo
+          // una URL fresca a la API de Meta a partir del media_id.
+          if (directUrl) {
+            try {
+              console.log('?? Reintentando: solicitando URL fresca via media_id...');
+              const meta = await getMediaMetadata(mediaId);
+              const localPath = await downloadMediaFile(meta.url, candidateFilename);
+              filename = candidateFilename;
+              console.log('? Audio entrante guardado exitosamente en el reintento:', localPath);
+            } catch (retryErr) {
+              console.error('? El reintento tambien fallo al descargar audio entrante:', retryErr.message);
+            }
+          }
         }
       }
 
